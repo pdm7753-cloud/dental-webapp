@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>ثبت نوبت</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  /* ── tokens ── */
+  :root {
+    --bg:        #f0f4f8;
+    --card:      #ffffff;
+    --teal:      #0a7c6e;
+    --teal-lt:   #e6f4f2;
+    --teal-mid:  #0d9e8c;
+    --text:      #1a2733;
+    --muted:     #7a8fa0;
+    --border:    #d8e4ec;
+    --drum-h:    52px;
+    --drum-vis:  3;   /* تعداد آیتم مرئی */
+    --radius:    16px;
+    --shadow:    0 4px 24px rgba(10,124,110,.10);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: 'Vazirmatn', Tahoma, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── header ── */
+  .header {
+    background: var(--teal);
+    color: #fff;
+    padding: 18px 20px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .header svg { flex-shrink: 0; }
+  .header h1 { font-size: 17px; font-weight: 700; line-height: 1.2; }
+  .header p  { font-size: 12px; opacity: .75; margin-top: 2px; }
+
+  /* ── steps ── */
+  .steps {
+    display: flex;
+    gap: 0;
+    background: var(--teal);
+    padding: 0 20px 16px;
+    justify-content: center;
+  }
+  .step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    position: relative;
+  }
+  .step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 14px; right: calc(-50% + 14px);
+    width: calc(100% - 28px);
+    height: 2px;
+    background: rgba(255,255,255,.3);
+    z-index: 0;
+  }
+  .step.done::after  { background: rgba(255,255,255,.7); }
+  .step-dot {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.2);
+    border: 2px solid rgba(255,255,255,.4);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: #fff;
+    position: relative; z-index: 1;
+    transition: background .25s, border-color .25s;
+  }
+  .step.active .step-dot { background: #fff; color: var(--teal); border-color: #fff; }
+  .step.done   .step-dot { background: rgba(255,255,255,.5); border-color: rgba(255,255,255,.7); }
+  .step-label { font-size: 10px; color: rgba(255,255,255,.7); margin-top: 4px; }
+  .step.active .step-label { color: #fff; font-weight: 600; }
+
+  /* ── body scroll ── */
+  .body { flex: 1; overflow-y: auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; }
+
+  /* ── card ── */
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .card-title {
+    font-size: 13px; font-weight: 700; color: var(--muted);
+    padding: 14px 16px 0;
+    text-transform: uppercase; letter-spacing: .05em;
+  }
+
+  /* ── doctor picker ── */
+  .doctor-grid { display: flex; flex-direction: column; gap: 0; }
+  .doctor-btn {
+    display: flex; align-items: center; gap: 14px;
+    padding: 16px;
+    border: none; background: none; cursor: pointer; width: 100%;
+    text-align: right; border-bottom: 1px solid var(--border);
+    transition: background .15s;
+  }
+  .doctor-btn:last-child { border-bottom: none; }
+  .doctor-btn:active { background: var(--teal-lt); }
+  .doctor-btn.selected { background: var(--teal-lt); }
+  .doctor-avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: var(--teal-lt);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
+    border: 2px solid transparent;
+    transition: border-color .2s;
+  }
+  .doctor-btn.selected .doctor-avatar { border-color: var(--teal); }
+  .doctor-info { flex: 1; }
+  .doctor-name { font-size: 15px; font-weight: 600; color: var(--text); }
+  .doctor-spec { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .check-icon { width: 22px; height: 22px; color: var(--teal); opacity: 0; transition: opacity .2s; }
+  .doctor-btn.selected .check-icon { opacity: 1; }
+
+  /* ── drum picker ── */
+  .drum-row {
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px 16px;
+    align-items: flex-start;
+  }
+  .drum-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .drum-col-label { font-size: 11px; color: var(--muted); font-weight: 600; }
+
+  .drum-wrap {
+    position: relative;
+    width: 100%;
+    height: calc(var(--drum-h) * var(--drum-vis));
+    overflow: hidden;
+    border-radius: 12px;
+    background: #f7fafb;
+    border: 1.5px solid var(--border);
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+  }
+  .drum-wrap:active { cursor: grabbing; }
+
+  /* خط انتخاب */
+  .drum-wrap::before,
+  .drum-wrap::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0;
+    height: 1.5px;
+    background: var(--teal);
+    z-index: 2;
+    pointer-events: none;
+  }
+  .drum-wrap::before { top: calc(var(--drum-h) * 1); }
+  .drum-wrap::after  { top: calc(var(--drum-h) * 2); }
+
+  /* fade بالا/پایین */
+  .drum-fade {
+    position: absolute;
+    left: 0; right: 0; height: var(--drum-h);
+    z-index: 1; pointer-events: none;
+  }
+  .drum-fade.top    { top: 0;    background: linear-gradient(to bottom, rgba(247,250,251,.96), transparent); }
+  .drum-fade.bottom { bottom: 0; background: linear-gradient(to top,   rgba(247,250,251,.96), transparent); }
+
+  .drum-list {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    transition: transform .18s cubic-bezier(.25,.46,.45,.94);
+    will-change: transform;
+  }
+  .drum-item {
+    height: var(--drum-h);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 500;
+    color: var(--muted);
+    transition: color .15s, font-size .15s, font-weight .15s;
+  }
+  .drum-item.selected {
+    color: var(--teal);
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  /* ── reason grid ── */
+  .reason-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 12px 16px 16px;
+  }
+  .reason-btn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 6px; padding: 14px 8px;
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    background: none; cursor: pointer;
+    font-size: 12px; color: var(--text);
+    transition: border-color .15s, background .15s;
+    line-height: 1.3; text-align: center;
+  }
+  .reason-btn .emoji { font-size: 24px; }
+  .reason-btn:active  { background: var(--teal-lt); }
+  .reason-btn.selected {
+    border-color: var(--teal);
+    background: var(--teal-lt);
+    color: var(--teal);
+    font-weight: 600;
+  }
+  .reason-btn.full { grid-column: span 2; flex-direction: row; padding: 12px 16px; }
+
+  /* ── summary card ── */
+  .summary { display: flex; flex-direction: column; gap: 0; }
+  .summary-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .summary-row:last-child { border-bottom: none; }
+  .summary-label { color: var(--muted); font-size: 13px; }
+  .summary-value { font-weight: 600; color: var(--text); }
+
+  /* ── nav buttons ── */
+  .nav { display: flex; gap: 10px; padding: 0 16px 20px; }
+  .btn-back {
+    flex: 0 0 80px; height: 50px;
+    border: 1.5px solid var(--border); border-radius: 14px;
+    background: var(--card); color: var(--text);
+    font-size: 14px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+  }
+  .btn-next {
+    flex: 1; height: 50px;
+    background: var(--teal); color: #fff;
+    border: none; border-radius: 14px;
+    font-size: 15px; font-weight: 700; cursor: pointer;
+    transition: background .15s, transform .1s;
+  }
+  .btn-next:active { transform: scale(.97); }
+  .btn-next:disabled { background: var(--muted); cursor: default; }
+  .btn-next.confirm { background: #0a6b40; }
+
+  /* ── page visibility ── */
+  .page { display: none; }
+  .page.active { display: contents; }
+
+  /* ── toast ── */
+  .toast {
+    position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: #1a2733; color: #fff;
+    padding: 10px 20px; border-radius: 30px;
+    font-size: 13px; opacity: 0;
+    transition: opacity .3s, transform .3s;
+    pointer-events: none; white-space: nowrap;
+    z-index: 999;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<div class="header">
+  <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+    <circle cx="16" cy="16" r="16" fill="rgba(255,255,255,.15)"/>
+    <path d="M10 13c0-3.314 2.686-6 6-6s6 2.686 6 6c0 2-.8 3.5-1.5 5-.7 1.5-1 3-1 4.5 0 .276-.224.5-.5.5s-.5-.224-.5-.5c0-1.5-.3-3-1-4.5S10 15 10 13z" fill="#fff"/>
+  </svg>
+  <div>
+    <h1>مطب دندانپزشکی</h1>
+    <p>ثبت نوبت آنلاین</p>
+  </div>
+</div>
+
+<!-- ── STEPS ── -->
+<div class="steps" id="stepsBar">
+  <div class="step active" data-step="1"><div class="step-dot">۱</div><div class="step-label">دکتر</div></div>
+  <div class="step"        data-step="2"><div class="step-dot">۲</div><div class="step-label">تاریخ</div></div>
+  <div class="step"        data-step="3"><div class="step-dot">۳</div><div class="step-label">دلیل</div></div>
+  <div class="step"        data-step="4"><div class="step-dot">۴</div><div class="step-label">تأیید</div></div>
+</div>
+
+<div class="body" id="mainBody">
+
+<!-- ══════════════ PAGE 1: دکتر ══════════════ -->
+<div class="page active" id="page1">
+  <div class="card">
+    <div class="card-title">انتخاب پزشک</div>
+    <div class="doctor-grid">
+      <button class="doctor-btn" data-doc="nagshvarian" onclick="selectDoctor(this)">
+        <div class="doctor-avatar">👩‍⚕️</div>
+        <div class="doctor-info">
+          <div class="doctor-name">دکتر نقشواریان</div>
+          <div class="doctor-spec">دندانپزشک عمومی</div>
+        </div>
+        <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M20 6L9 17l-5-5"/>
+        </svg>
+      </button>
+      <button class="doctor-btn" data-doc="farajinezhad" onclick="selectDoctor(this)">
+        <div class="doctor-avatar">👨‍⚕️</div>
+        <div class="doctor-info">
+          <div class="doctor-name">دکتر فرجی‌نژاد</div>
+          <div class="doctor-spec">دندانپزشک عمومی</div>
+        </div>
+        <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M20 6L9 17l-5-5"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ PAGE 2: تاریخ و ساعت ══════════════ -->
+<div class="page" id="page2">
+  <div class="card">
+    <div class="card-title">تاریخ مراجعه</div>
+    <div class="drum-row">
+      <div class="drum-col">
+        <div class="drum-col-label">سال</div>
+        <div class="drum-wrap" id="drum-year">
+          <div class="drum-fade top"></div>
+          <div class="drum-fade bottom"></div>
+          <div class="drum-list" id="list-year"></div>
+        </div>
+      </div>
+      <div class="drum-col">
+        <div class="drum-col-label">ماه</div>
+        <div class="drum-wrap" id="drum-month">
+          <div class="drum-fade top"></div>
+          <div class="drum-fade bottom"></div>
+          <div class="drum-list" id="list-month"></div>
+        </div>
+      </div>
+      <div class="drum-col">
+        <div class="drum-col-label">روز</div>
+        <div class="drum-wrap" id="drum-day">
+          <div class="drum-fade top"></div>
+          <div class="drum-fade bottom"></div>
+          <div class="drum-list" id="list-day"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">ساعت مراجعه</div>
+    <div class="drum-row" style="justify-content:center;">
+      <div class="drum-col" style="max-width:160px;">
+        <div class="drum-col-label">ساعت</div>
+        <div class="drum-wrap" id="drum-time">
+          <div class="drum-fade top"></div>
+          <div class="drum-fade bottom"></div>
+          <div class="drum-list" id="list-time"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ PAGE 3: دلیل مراجعه ══════════════ -->
+<div class="page" id="page3">
+  <div class="card">
+    <div class="card-title">دلیل مراجعه</div>
+    <div class="reason-grid">
+      <button class="reason-btn" data-reason="پر کردن دندان"        onclick="selectReason(this)"><span class="emoji">🦷</span>پر کردن دندان</button>
+      <button class="reason-btn" data-reason="کشیدن دندان"           onclick="selectReason(this)"><span class="emoji">🔧</span>کشیدن دندان</button>
+      <button class="reason-btn" data-reason="دندان درد"             onclick="selectReason(this)"><span class="emoji">😣</span>دندان درد</button>
+      <button class="reason-btn" data-reason="روکش و ایمپلنت"        onclick="selectReason(this)"><span class="emoji">👑</span>روکش و ایمپلنت</button>
+      <button class="reason-btn" data-reason="جرم‌گیری و سفیدکردن"  onclick="selectReason(this)"><span class="emoji">✨</span>جرم‌گیری</button>
+      <button class="reason-btn" data-reason="ارتودنسی"              onclick="selectReason(this)"><span class="emoji">😬</span>ارتودنسی</button>
+      <button class="reason-btn full" data-reason="سایر"             onclick="selectReason(this)"><span class="emoji">📋</span>سایر موارد</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ PAGE 4: تأیید نهایی ══════════════ -->
+<div class="page" id="page4">
+  <div class="card">
+    <div class="card-title">خلاصه نوبت</div>
+    <div class="summary" id="summaryBox"></div>
+  </div>
+</div>
+
+</div><!-- /body -->
+
+<!-- ── NAV ── -->
+<div class="nav" id="navBar">
+  <button class="btn-back" id="btnBack" onclick="goBack()" style="display:none">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <path d="M9 18l6-6-6-6"/>
+    </svg>
+    قبلی
+  </button>
+  <button class="btn-next" id="btnNext" onclick="goNext()" disabled>بعدی ←</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ══════════════════════════════════════════════
+   TELEGRAM WEB APP INIT
+══════════════════════════════════════════════ */
+const tg = window.Telegram?.WebApp;
+if (tg) {
+  tg.ready();
+  tg.expand();
+  tg.enableClosingConfirmation();
+}
+
+/* ══════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════ */
+const state = {
+  doctor: null, doctorLabel: null,
+  year: null, month: null, day: null, time: null,
+  dateDisplay: null, dateGregorian: null,
+  reason: null,
+};
+let currentPage = 1;
+
+/* ══════════════════════════════════════════════
+   JALALI UTILS
+══════════════════════════════════════════════ */
+const MONTHS_FA = ['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور',
+                   'مهر','آبان','آذر','دی','بهمن','اسفند'];
+const TO_FA = s => String(s).replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
+const FROM_FA = s => String(s).replace(/[۰-۹]/g, d => d.charCodeAt(0) - '۰'.charCodeAt(0));
+
+/* تبدیل جلالی به میلادی (الگوریتم ساده) */
+function jalaliToGregorian(jy, jm, jd) {
+  const epbase = jy - (jy >= 0 ? 474 : 473);
+  const epyear = 474 + (epbase % 2820);
+  const t = jd + (jm <= 6 ? (jm - 1) * 31 : (jm - 1) * 30 + 6)
+    + Math.floor((epyear * 682 - 110) / 2816)
+    + (epyear - 1) * 365
+    + Math.floor(epbase / 2820) * 1029983
+    + 1948319.5;
+  const jdn = Math.floor(t);
+  let l = jdn + 68569, n = Math.floor(4 * l / 146097);
+  l -= Math.floor((146097 * n + 3) / 4);
+  let y = Math.floor(4000 * (l + 1) / 1461001);
+  l -= Math.floor(1461 * y / 4) - 31;
+  let m = Math.floor(80 * l / 2447);
+  const gd = l - Math.floor(2447 * m / 80);
+  l = Math.floor(m / 11);
+  const gm = m + 2 - 12 * l;
+  const gy = 100 * (n - 49) + y + l;
+  return [gy, gm, gd];
+}
+
+function daysInJalaliMonth(jy, jm) {
+  if (jm <= 6) return 31;
+  if (jm <= 11) return 30;
+  // اسفند: سال کبیسه
+  const [gy] = jalaliToGregorian(jy, 12, 1);
+  return (gy % 4 === 0 && (gy % 100 !== 0 || gy % 400 === 0)) ? 30 : 29;
+}
+
+function todayJalali() {
+  const now = new Date();
+  // تقریب ساده برای تهران (UTC+3:30)
+  const tehran = new Date(now.getTime() + (3.5 * 60 * 60 * 1000));
+  const gy = tehran.getUTCFullYear(), gm = tehran.getUTCMonth() + 1, gd = tehran.getUTCDate();
+  // میلادی به جلالی
+  let jy, jm, jd;
+  const g_d_no = 365 * gy + Math.floor((gy + 3) / 4) - Math.floor((gy + 99) / 100) + Math.floor((gy + 399) / 400);
+  const months_g = [0,31,59,90,120,151,181,212,243,273,304,334];
+  let g_d_no2 = g_d_no + months_g[gm - 1] + gd;
+  if (gm > 2 && (gy % 4 === 0 && (gy % 100 !== 0 || gy % 400 === 0))) g_d_no2++;
+  let j_d_no = g_d_no2 - 79;
+  const j_np = Math.floor(j_d_no / 12053); j_d_no %= 12053;
+  jy = 979 + 33 * j_np + 4 * Math.floor(j_d_no / 1461);
+  j_d_no %= 1461;
+  if (j_d_no >= 366) { jy += Math.floor((j_d_no - 1) / 365); j_d_no = (j_d_no - 1) % 365; }
+  const months_j = [0,31,62,93,124,155,186,216,246,276,306,336];
+  for (jm = 0; jm < 11; jm++) if (j_d_no < months_j[jm + 1]) break;
+  jd = j_d_no - months_j[jm] + 1; jm++;
+  return [jy, jm, jd];
+}
+
+/* ══════════════════════════════════════════════
+   DRUM PICKER
+══════════════════════════════════════════════ */
+const DRUM_H = 52; // px — باید با --drum-h هماهنگ باشه
+
+class Drum {
+  constructor(wrapId, listId, items, initial = 0, onChange) {
+    this.wrap    = document.getElementById(wrapId);
+    this.list    = document.getElementById(listId);
+    this.items   = items;
+    this.idx     = initial;
+    this.onChange = onChange;
+    this._touch  = null;
+    this._startY = 0;
+    this._startIdx = 0;
+    this._vel = 0;
+    this._lastY = 0;
+    this._lastT = 0;
+    this._animFrame = null;
+
+    this._render();
+    this._attach();
+  }
+
+  setItems(items, idx = 0) {
+    this.items = items;
+    this.idx   = Math.min(idx, items.length - 1);
+    this._render();
+  }
+
+  _render() {
+    const n = this.items.length;
+    this.list.innerHTML = this.items.map((v, i) =>
+      `<div class="drum-item${i === this.idx ? ' selected' : ''}">${v}</div>`
+    ).join('');
+    this._setY(this.idx, false);
+  }
+
+  _setY(idx, animate = true) {
+    this.idx = Math.max(0, Math.min(idx, this.items.length - 1));
+    const offset = DRUM_H - this.idx * DRUM_H; // یه آیتم از بالا offset
+    this.list.style.transition = animate ? 'transform .18s cubic-bezier(.25,.46,.45,.94)' : 'none';
+    this.list.style.transform  = `translateY(${offset}px)`;
+    // آپدیت کلاس selected
+    [...this.list.children].forEach((el, i) => {
+      el.classList.toggle('selected', i === this.idx);
+    });
+    this.onChange?.(this.idx, this.items[this.idx]);
+  }
+
+  _attach() {
+    this.wrap.addEventListener('touchstart', e => this._ts(e), {passive: false});
+    this.wrap.addEventListener('touchmove',  e => this._tm(e), {passive: false});
+    this.wrap.addEventListener('touchend',   e => this._te(e));
+    this.wrap.addEventListener('mousedown',  e => this._ms(e));
+    this.wrap.addEventListener('wheel',      e => this._wheel(e), {passive: false});
+  }
+
+  _ts(e) {
+    e.preventDefault();
+    const t = e.touches[0];
+    this._startY = t.clientY; this._startIdx = this.idx;
+    this._lastY = t.clientY; this._lastT = Date.now(); this._vel = 0;
+  }
+  _tm(e) {
+    e.preventDefault();
+    const t = e.touches[0];
+    const now = Date.now();
+    this._vel = (this._lastY - t.clientY) / (now - this._lastT + 1);
+    this._lastY = t.clientY; this._lastT = now;
+    const delta = Math.round((this._startY - t.clientY) / DRUM_H);
+    this._setY(this._startIdx + delta, false);
+  }
+  _te() {
+    // momentum
+    let vel = this._vel;
+    const step = () => {
+      if (Math.abs(vel) < .05) { this._setY(Math.round(this.idx), true); return; }
+      this._setY(this.idx + vel * 5, false);
+      vel *= .85;
+      this._animFrame = requestAnimationFrame(step);
+    };
+    if (this._animFrame) cancelAnimationFrame(this._animFrame);
+    step();
+  }
+
+  _ms(e) {
+    this._startY = e.clientY; this._startIdx = this.idx;
+    const move = ev => {
+      const delta = Math.round((this._startY - ev.clientY) / DRUM_H);
+      this._setY(this._startIdx + delta, false);
+    };
+    const up = () => { this._setY(Math.round(this.idx), true); document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  }
+
+  _wheel(e) {
+    e.preventDefault();
+    this._setY(this.idx + (e.deltaY > 0 ? 1 : -1), true);
+  }
+}
+
+/* ══════════════════════════════════════════════
+   INIT DRUMS
+══════════════════════════════════════════════ */
+let drumYear, drumMonth, drumDay, drumTime;
+let [todayJY, todayJM, todayJD] = todayJalali();
+
+const YEARS     = [todayJY, todayJY + 1, todayJY + 2].map(y => TO_FA(y));
+const WORK_START = 9, WORK_END = 20, LUNCH_S = 13, LUNCH_E = 14, DURATION = 30;
+
+function buildTimeSlots() {
+  const slots = [];
+  let h = WORK_START, m = 0;
+  while (h < WORK_END) {
+    if (!(h >= LUNCH_S && h < LUNCH_E))
+      slots.push(TO_FA(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`));
+    m += DURATION;
+    if (m >= 60) { h += Math.floor(m / 60); m %= 60; }
+  }
+  return slots;
+}
+
+function buildDayList(yi, mi) {
+  const jy = todayJY + yi, jm = mi + 1;
+  const total = daysInJalaliMonth(jy, jm);
+  return Array.from({length: total}, (_, i) => TO_FA(i + 1));
+}
+
+function initDrums() {
+  const initMi = todayJM - 1;
+  const initDi = todayJD - 1;
+
+  drumYear = new Drum('drum-year', 'list-year', YEARS, 0, (i) => {
+    state.year = todayJY + i;
+    updateDayList();
+    readDate();
+  });
+
+  drumMonth = new Drum('drum-month', 'list-month', MONTHS_FA, initMi, (i) => {
+    state.month = i + 1;
+    updateDayList();
+    readDate();
+  });
+
+  drumDay = new Drum('drum-day', 'list-day', buildDayList(0, initMi), initDi, (i) => {
+    state.day = i + 1;
+    readDate();
+  });
+
+  drumTime = new Drum('drum-time', 'list-time', buildTimeSlots(), 0, (i, v) => {
+    state.time = String(FROM_FA(v));
+    updateNextBtn();
+  });
+
+  state.year  = todayJY;
+  state.month = todayJM;
+  state.day   = todayJD;
+  state.time  = buildTimeSlots()[0]?.replace(/[۰-۹]/g, d => d.charCodeAt(0) - '۰'.charCodeAt(0)) || '09:00';
+  readDate();
+}
+
+function updateDayList() {
+  const yi = (state.year  ?? todayJY)  - todayJY;
+  const mi = (state.month ?? todayJM) - 1;
+  const days = buildDayList(yi, mi);
+  const curDay = Math.min(state.day ?? 1, days.length) - 1;
+  drumDay.setItems(days, curDay);
+  state.day = curDay + 1;
+  readDate();
+}
+
+function readDate() {
+  if (!state.year || !state.month || !state.day) return;
+  const [gy, gm, gd] = jalaliToGregorian(state.year, state.month, state.day);
+  state.dateGregorian = `${gy}-${String(gm).padStart(2,'0')}-${String(gd).padStart(2,'0')}`;
+  state.dateDisplay   = `${TO_FA(state.year)}/${TO_FA(state.month)}/${TO_FA(state.day)}`;
+  // بررسی جمعه
+  const d = new Date(gy, gm - 1, gd);
+  state.isFriday = d.getDay() === 5;
+  state.isPast   = d < new Date(new Date().toDateString());
+  updateNextBtn();
+}
+
+/* ══════════════════════════════════════════════
+   PAGE NAVIGATION
+══════════════════════════════════════════════ */
+function updateSteps(page) {
+  document.querySelectorAll('.step').forEach(s => {
+    const n = +s.dataset.step;
+    s.classList.toggle('active', n === page);
+    s.classList.toggle('done',   n < page);
+  });
+}
+
+function showPage(n) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(`page${n}`).classList.add('active');
+  document.getElementById('btnBack').style.display = n > 1 ? 'flex' : 'none';
+  updateSteps(n);
+  currentPage = n;
+  if (n === 2 && !drumYear) initDrums();
+  if (n === 4) buildSummary();
+  updateNextBtn();
+  document.getElementById('mainBody').scrollTop = 0;
+}
+
+function updateNextBtn() {
+  const btn = document.getElementById('btnNext');
+  let ok = false;
+  if (currentPage === 1) ok = !!state.doctor;
+  if (currentPage === 2) {
+    ok = !!state.dateGregorian && !!state.time;
+    if (state.isFriday) { btn.disabled = true; btn.textContent = 'جمعه تعطیل است'; return; }
+    if (state.isPast)   { btn.disabled = true; btn.textContent = 'تاریخ گذشته است'; return; }
+  }
+  if (currentPage === 3) ok = !!state.reason;
+  if (currentPage === 4) { btn.disabled = false; btn.textContent = '✅ ثبت نوبت'; btn.classList.add('confirm'); return; }
+  btn.disabled = !ok;
+  btn.classList.remove('confirm');
+  btn.textContent = 'بعدی ←';
+}
+
+function goNext() {
+  if (currentPage < 4) showPage(currentPage + 1);
+  else submitBooking();
+}
+function goBack() {
+  if (currentPage > 1) showPage(currentPage - 1);
+}
+
+/* ══════════════════════════════════════════════
+   DOCTOR SELECT
+══════════════════════════════════════════════ */
+function selectDoctor(btn) {
+  document.querySelectorAll('.doctor-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  state.doctor      = btn.dataset.doc;
+  state.doctorLabel = btn.querySelector('.doctor-name').textContent;
+  updateNextBtn();
+}
+
+/* ══════════════════════════════════════════════
+   REASON SELECT
+══════════════════════════════════════════════ */
+function selectReason(btn) {
+  document.querySelectorAll('.reason-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  state.reason = btn.dataset.reason;
+  updateNextBtn();
+}
+
+/* ══════════════════════════════════════════════
+   SUMMARY
+══════════════════════════════════════════════ */
+function buildSummary() {
+  const rows = [
+    ['👨‍⚕️ پزشک',   state.doctorLabel],
+    ['📅 تاریخ',   state.dateDisplay],
+    ['⏰ ساعت',    TO_FA(state.time)],
+    ['🦷 دلیل',    state.reason],
+  ];
+  document.getElementById('summaryBox').innerHTML = rows.map(([l, v]) =>
+    `<div class="summary-row"><span class="summary-label">${l}</span><span class="summary-value">${v}</span></div>`
+  ).join('');
+}
+
+/* ══════════════════════════════════════════════
+   SUBMIT
+══════════════════════════════════════════════ */
+function submitBooking() {
+  const payload = {
+    doctor:       state.doctor,
+    doctorLabel:  state.doctorLabel,
+    date:         state.dateGregorian,
+    dateDisplay:  state.dateDisplay,
+    time:         state.time,
+    reason:       state.reason,
+  };
+
+  if (tg) {
+    tg.sendData(JSON.stringify(payload));
+  } else {
+    // fallback برای تست در مرورگر
+    alert('داده ارسال شد:\n' + JSON.stringify(payload, null, 2));
+  }
+}
+
+/* ══════════════════════════════════════════════
+   TOAST
+══════════════════════════════════════════════ */
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+/* ── init ── */
+showPage(1);
+</script>
+</body>
+</html>
