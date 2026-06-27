@@ -467,54 +467,104 @@ const MONTHS_FA = ['فروردین','اردیبهشت','خرداد','تیر','م
 const TO_FA = s => String(s).replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
 const FROM_FA = s => String(s).replace(/[۰-۹]/g, d => d.charCodeAt(0) - '۰'.charCodeAt(0));
 
-/* تبدیل جلالی به میلادی (الگوریتم ساده) */
+/* تبدیل جلالی ↔ میلادی — الگوریتم بورکوفسکی (Borkowski)، همان الگوریتمی که
+   تقویم رسمی ایران و کتابخانه‌ی معروف jalaali-js استفاده می‌کنند.
+   با تاریخ‌های رسمی نوروز ۱۴۰۴ و ۱۴۰۵ تطبیق و تست شده است. */
+function _div(a, b) { return Math.trunc(a / b); }
+function _mod(a, b) { return a - Math.trunc(a / b) * b; }
+
+const _JALALI_BREAKS = [-61, 9, 38, 199, 426, 686, 756, 818, 1111, 1181,
+                         1210, 1635, 2060, 2097, 2192, 2262, 2324, 2394, 2456, 3178];
+
+function _jalCalCore(jy) {
+  const gy = jy + 621;
+  let leapJ = -14;
+  let jp = _JALALI_BREAKS[0];
+  let jm = 0, jump = 0;
+  for (let i = 1; i < _JALALI_BREAKS.length; i++) {
+    jm = _JALALI_BREAKS[i];
+    jump = jm - jp;
+    if (jy < jm) break;
+    leapJ = leapJ + _div(jump, 33) * 8 + _div(_mod(jump, 33), 4);
+    jp = jm;
+  }
+  const n = jy - jp;
+  leapJ = leapJ + _div(n, 33) * 8 + _div(_mod(n, 33) + 3, 4);
+  if (_mod(jump, 33) === 4 && jump - n === 4) leapJ += 1;
+  const leapG = _div(gy, 4) - _div((_div(gy, 100) + 1) * 3, 4) - 150;
+  const march = 20 + leapJ - leapG;
+  return { gy, march, jump, n };
+}
+
+function _leapFromCycle(jump, n) {
+  let adjusted = n;
+  if (jump - n < 6) adjusted = n - jump + _div(jump + 4, 33) * 33;
+  let leap = _mod(_mod(adjusted + 1, 33) - 1, 4);
+  if (leap === -1) leap = 4;
+  return leap;
+}
+
+function _jalCal(jy) {
+  const { gy, march, jump, n } = _jalCalCore(jy);
+  return { leap: _leapFromCycle(jump, n), gy, march };
+}
+
+function _g2d(gy, gm, gd) {
+  let d = _div((gy + _div(gm - 8, 6) + 100100) * 1461, 4) + _div(153 * _mod(gm + 9, 12) + 2, 5) + gd - 34840408;
+  d = d - _div(_div(gy + 100100 + _div(gm - 8, 6), 100) * 3, 4) + 752;
+  return d;
+}
+
+function _d2g(jdn) {
+  let j = 4 * jdn + 139361631;
+  j = j + _div(_div(4 * jdn + 183187720, 146097) * 3, 4) * 4 - 3908;
+  const i = _div(_mod(j, 1461), 4) * 5 + 308;
+  const gd = _div(_mod(i, 153), 5) + 1;
+  const gm = _mod(_div(i, 153), 12) + 1;
+  const gy = _div(j, 1461) - 100100 + _div(8 - gm, 6);
+  return { gy, gm, gd };
+}
+
+function _j2d(jy, jm, jd) {
+  const r = _jalCal(jy);
+  return _g2d(r.gy, 3, r.march) + (jm - 1) * 31 - _div(jm, 7) * (jm - 7) + jd - 1;
+}
+
+function _d2j(jdn) {
+  const gy = _d2g(jdn).gy;
+  let jy = gy - 621;
+  const r = _jalCal(jy);
+  const jdn1f = _g2d(gy, 3, r.march);
+  let k = jdn - jdn1f;
+  if (k >= 0) {
+    if (k <= 185) return { jy, jm: 1 + _div(k, 31), jd: _mod(k, 31) + 1 };
+    k -= 186;
+  } else {
+    jy -= 1;
+    k += 179;
+    if (r.leap === 1) k += 1;
+  }
+  return { jy, jm: 7 + _div(k, 30), jd: _mod(k, 30) + 1 };
+}
+
 function jalaliToGregorian(jy, jm, jd) {
-  const epbase = jy - (jy >= 0 ? 474 : 473);
-  const epyear = 474 + (epbase % 2820);
-  const t = jd + (jm <= 6 ? (jm - 1) * 31 : (jm - 1) * 30 + 6)
-    + Math.floor((epyear * 682 - 110) / 2816)
-    + (epyear - 1) * 365
-    + Math.floor(epbase / 2820) * 1029983
-    + 1948319.5;
-  const jdn = Math.floor(t);
-  let l = jdn + 68569, n = Math.floor(4 * l / 146097);
-  l -= Math.floor((146097 * n + 3) / 4);
-  let y = Math.floor(4000 * (l + 1) / 1461001);
-  l -= Math.floor(1461 * y / 4) - 31;
-  let m = Math.floor(80 * l / 2447);
-  const gd = l - Math.floor(2447 * m / 80);
-  l = Math.floor(m / 11);
-  const gm = m + 2 - 12 * l;
-  const gy = 100 * (n - 49) + y + l;
-  return [gy, gm, gd];
+  const g = _d2g(_j2d(jy, jm, jd));
+  return [g.gy, g.gm, g.gd];
+}
+
+function gregorianToJalali(gy, gm, gd) {
+  const j = _d2j(_g2d(gy, gm, gd));
+  return [j.jy, j.jm, j.jd];
+}
+
+function isLeapJalaliYear(jy) {
+  return _jalCal(jy).leap === 0;
 }
 
 function daysInJalaliMonth(jy, jm) {
   if (jm <= 6) return 31;
   if (jm <= 11) return 30;
-  // اسفند: سال کبیسه
-  const [gy] = jalaliToGregorian(jy, 12, 1);
-  return (gy % 4 === 0 && (gy % 100 !== 0 || gy % 400 === 0)) ? 30 : 29;
-}
-
-/* جی‌دی‌ان (Julian Day Number) از تاریخ جلالی — برای محاسبه دقیق امروز */
-function jalaliToJDN(jy, jm, jd) {
-  const epbase = jy - (jy >= 0 ? 474 : 473);
-  const epyear = 474 + (epbase % 2820);
-  const t = jd + (jm <= 6 ? (jm - 1) * 31 : (jm - 1) * 30 + 6)
-    + Math.floor((epyear * 682 - 110) / 2816)
-    + (epyear - 1) * 365
-    + Math.floor(epbase / 2820) * 1029983
-    + 1948319.5;
-  return Math.floor(t);
-}
-
-/* جی‌دی‌ان از تاریخ میلادی (فرمول استاندارد) */
-function gregorianToJDN(gy, gm, gd) {
-  const a = Math.floor((14 - gm) / 12);
-  const y = gy + 4800 - a;
-  const m = gm + 12 * a - 3;
-  return gd + Math.floor((153 * m + 2) / 5) + 365 * y + Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) - 32045;
+  return isLeapJalaliYear(jy) ? 30 : 29;
 }
 
 function todayJalali() {
@@ -522,20 +572,7 @@ function todayJalali() {
   // تقریب ساده برای تهران (UTC+3:30)
   const tehran = new Date(now.getTime() + (3.5 * 60 * 60 * 1000));
   const gy = tehran.getUTCFullYear(), gm = tehran.getUTCMonth() + 1, gd = tehran.getUTCDate();
-  const jdn = gregorianToJDN(gy, gm, gd);
-
-  // تخمین اولیه سال جلالی و تنظیم دقیق با مقایسه jdn
-  let jy = gy - 621;
-  while (jalaliToJDN(jy + 1, 1, 1) <= jdn) jy++;
-  while (jalaliToJDN(jy, 1, 1) > jdn) jy--;
-
-  for (let jm = 1; jm <= 12; jm++) {
-    const startNext = jm < 12 ? jalaliToJDN(jy, jm + 1, 1) : jalaliToJDN(jy + 1, 1, 1);
-    if (jdn < startNext) {
-      const startThis = jalaliToJDN(jy, jm, 1);
-      return [jy, jm, jdn - startThis + 1];
-    }
-  }
+  return gregorianToJalali(gy, gm, gd);
 }
 
 /* ══════════════════════════════════════════════
