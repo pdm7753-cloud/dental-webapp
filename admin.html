@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>پنل مدیریت مطب</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root {
+  --bg:       #f0f4f8;
+  --card:     #ffffff;
+  --teal:     #0a7c6e;
+  --teal-lt:  #e6f4f2;
+  --teal-mid: #0d9e8c;
+  --red:      #e53935;
+  --red-lt:   #fdecea;
+  --green:    #2e7d32;
+  --green-lt: #e8f5e9;
+  --orange:   #ef6c00;
+  --orange-lt:#fff3e0;
+  --text:     #1a2733;
+  --muted:    #7a8fa0;
+  --border:   #d8e4ec;
+  --radius:   14px;
+  --shadow:   0 2px 16px rgba(10,124,110,.09);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body {
+  font-family: 'Vazirmatn', Tahoma, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  direction: rtl;
+}
+
+/* ── login ── */
+#loginScreen {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  min-height: 100dvh; gap: 20px; padding: 30px;
+}
+#loginScreen .logo {
+  width: 70px; height: 70px; background: var(--teal);
+  border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; font-size: 32px;
+}
+#loginScreen h2 { font-size: 20px; color: var(--teal); }
+#loginScreen p  { font-size: 13px; color: var(--muted); text-align: center; }
+.input-wrap { width: 100%; max-width: 320px; position: relative; }
+.input-wrap input {
+  width: 100%; padding: 14px 16px; border: 2px solid var(--border);
+  border-radius: 12px; font-size: 15px; font-family: inherit;
+  outline: none; text-align: center; letter-spacing: 4px;
+  transition: border-color .2s;
+}
+.input-wrap input:focus { border-color: var(--teal); }
+.btn-login {
+  width: 100%; max-width: 320px; padding: 14px;
+  background: var(--teal); color: #fff; border: none;
+  border-radius: 12px; font-size: 16px; font-family: inherit;
+  font-weight: 700; cursor: pointer;
+}
+.btn-login:active { opacity: .85; }
+.login-err { color: var(--red); font-size: 13px; display: none; }
+
+/* ── main ── */
+#mainScreen { display: none; }
+
+/* ── header ── */
+.header {
+  background: var(--teal); color: #fff;
+  padding: 16px 18px 14px;
+  display: flex; align-items: center; gap: 10px;
+  position: sticky; top: 0; z-index: 10;
+}
+.header-icon { font-size: 22px; }
+.header h1 { font-size: 16px; font-weight: 700; flex: 1; }
+.header .badge {
+  background: rgba(255,255,255,.2);
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 12px;
+}
+
+/* ── tabs ── */
+.tabs {
+  display: flex; background: #fff;
+  border-bottom: 2px solid var(--border);
+  overflow-x: auto; position: sticky; top: 56px; z-index: 9;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  flex: 1; min-width: 80px; padding: 12px 8px;
+  text-align: center; font-size: 12px; font-weight: 600;
+  color: var(--muted); cursor: pointer; white-space: nowrap;
+  border-bottom: 3px solid transparent; transition: all .2s;
+}
+.tab.active { color: var(--teal); border-bottom-color: var(--teal); }
+.tab span { display: block; font-size: 18px; }
+
+/* ── content ── */
+.content { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+/* ── stat cards ── */
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.stat-card {
+  background: var(--card); border-radius: var(--radius);
+  padding: 14px 12px; box-shadow: var(--shadow);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.stat-card .icon { font-size: 22px; }
+.stat-card .num  { font-size: 26px; font-weight: 800; color: var(--teal); }
+.stat-card .lbl  { font-size: 12px; color: var(--muted); }
+
+/* ── section title ── */
+.sec-title {
+  font-size: 13px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .5px;
+  padding: 4px 0 2px;
+}
+
+/* ── bar chart ── */
+.bar-chart { display: flex; flex-direction: column; gap: 8px; }
+.bar-row { display: flex; align-items: center; gap: 8px; }
+.bar-label { font-size: 12px; color: var(--muted); min-width: 72px; text-align: left; }
+.bar-outer { flex: 1; height: 10px; background: var(--bg); border-radius: 6px; overflow: hidden; }
+.bar-inner { height: 100%; background: var(--teal-mid); border-radius: 6px; transition: width .6s; }
+.bar-val { font-size: 12px; font-weight: 700; color: var(--text); min-width: 22px; text-align: right; }
+
+/* ── reason pills ── */
+.reason-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.reason-pill {
+  padding: 5px 10px; background: var(--teal-lt);
+  color: var(--teal); border-radius: 20px;
+  font-size: 12px; font-weight: 600;
+}
+.reason-pill span { font-weight: 800; }
+
+/* ── filter bar ── */
+.filter-bar {
+  display: flex; gap: 8px; background: var(--card);
+  border-radius: var(--radius); padding: 12px;
+  box-shadow: var(--shadow); flex-wrap: wrap;
+}
+.filter-bar select, .filter-bar input {
+  flex: 1; min-width: 100px; padding: 8px 10px;
+  border: 1px solid var(--border); border-radius: 8px;
+  font-size: 13px; font-family: inherit; background: var(--bg);
+  outline: none; color: var(--text);
+}
+.btn-filter {
+  padding: 8px 14px; background: var(--teal); color: #fff;
+  border: none; border-radius: 8px; font-size: 13px;
+  font-family: inherit; font-weight: 700; cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ── appointment cards ── */
+.apt-card {
+  background: var(--card); border-radius: var(--radius);
+  box-shadow: var(--shadow); overflow: hidden;
+}
+.apt-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--bg);
+}
+.apt-num {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--teal-lt); color: var(--teal);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 13px; flex-shrink: 0;
+}
+.apt-name   { font-weight: 700; font-size: 14px; }
+.apt-phone  { font-size: 11px; color: var(--muted); }
+.apt-status {
+  margin-right: auto; padding: 3px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 700;
+}
+.apt-status.pending   { background: var(--orange-lt); color: var(--orange); }
+.apt-status.confirmed { background: var(--green-lt);  color: var(--green);  }
+.apt-status.cancelled { background: var(--red-lt);    color: var(--red);    }
+
+.apt-body { padding: 10px 14px; display: flex; flex-direction: column; gap: 5px; }
+.apt-row  { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.apt-row .ico { font-size: 15px; width: 20px; text-align: center; }
+
+.apt-actions { display: flex; gap: 8px; padding: 10px 14px 12px; }
+.btn-confirm, .btn-cancel-apt {
+  flex: 1; padding: 9px; border: none; border-radius: 9px;
+  font-size: 13px; font-family: inherit; font-weight: 700;
+  cursor: pointer; transition: opacity .15s;
+}
+.btn-confirm    { background: var(--green-lt); color: var(--green); }
+.btn-cancel-apt { background: var(--red-lt);   color: var(--red);   }
+.btn-confirm:active, .btn-cancel-apt:active { opacity: .7; }
+.btn-confirm:disabled, .btn-cancel-apt:disabled {
+  opacity: .35; cursor: default;
+}
+
+/* ── empty / loading ── */
+.empty {
+  text-align: center; color: var(--muted);
+  padding: 40px 20px; font-size: 14px;
+}
+.empty .ico { font-size: 40px; margin-bottom: 10px; }
+.loading {
+  text-align: center; color: var(--muted);
+  padding: 30px; font-size: 14px;
+}
+
+/* ── toast ── */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(60px);
+  background: #1a2733; color: #fff; padding: 10px 20px;
+  border-radius: 24px; font-size: 13px; z-index: 999;
+  transition: transform .3s; pointer-events: none; white-space: nowrap;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- ── صفحه ورود ── -->
+<div id="loginScreen">
+  <div class="logo">🔐</div>
+  <h2>پنل مدیریت مطب</h2>
+  <p>برای ورود، رمز ادمین را وارد کنید</p>
+  <div class="input-wrap">
+    <input type="password" id="pwdInput" placeholder="رمز عبور" autocomplete="off"
+           onkeydown="if(event.key==='Enter') doLogin()">
+  </div>
+  <button class="btn-login" onclick="doLogin()">ورود</button>
+  <div class="login-err" id="loginErr">رمز اشتباه است</div>
+</div>
+
+<!-- ── صفحه اصلی ── -->
+<div id="mainScreen">
+  <div class="header">
+    <span class="header-icon">🏥</span>
+    <h1>پنل مدیریت</h1>
+    <span class="badge" id="clinicBadge">مطب دندانپزشکی</span>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('dashboard')" id="tab-dashboard">
+      <span>📊</span>داشبورد
+    </div>
+    <div class="tab" onclick="switchTab('appointments')" id="tab-appointments">
+      <span>📋</span>نوبت‌ها
+    </div>
+    <div class="tab" onclick="switchTab('today')" id="tab-today">
+      <span>📅</span>امروز
+    </div>
+    <div class="tab" onclick="switchTab('report')" id="tab-report">
+      <span>💰</span>گزارش
+    </div>
+  </div>
+
+  <!-- داشبورد -->
+  <div class="content" id="sec-dashboard">
+    <div class="stats-grid" id="statsGrid">
+      <div class="loading">در حال بارگذاری…</div>
+    </div>
+    <div class="sec-title">نوبت‌ها — ۷ روز اخیر</div>
+    <div class="bar-chart" id="chart7days"></div>
+    <div class="sec-title">بر اساس دکتر</div>
+    <div class="bar-chart" id="chartDoctor"></div>
+    <div class="sec-title">دلایل مراجعه</div>
+    <div class="reason-grid" id="reasonGrid"></div>
+  </div>
+
+  <!-- همه نوبت‌ها -->
+  <div class="content" id="sec-appointments" style="display:none">
+    <div class="filter-bar">
+      <select id="fltStatus">
+        <option value="">همه وضعیت‌ها</option>
+        <option value="pending">در انتظار</option>
+        <option value="confirmed">تأیید شده</option>
+        <option value="cancelled">لغو شده</option>
+      </select>
+      <input type="date" id="fltFrom" placeholder="از تاریخ">
+      <input type="date" id="fltTo"   placeholder="تا تاریخ">
+      <button class="btn-filter" onclick="loadAppointments()">🔍</button>
+    </div>
+    <div id="aptList"><div class="loading">در حال بارگذاری…</div></div>
+  </div>
+
+  <!-- نوبت‌های امروز -->
+  <div class="content" id="sec-today" style="display:none">
+    <div id="todayList"><div class="loading">در حال بارگذاری…</div></div>
+  </div>
+
+  <!-- گزارش مالی -->
+  <div class="content" id="sec-report" style="display:none">
+    <div class="stats-grid" id="revenueStats"></div>
+    <div class="sec-title">درآمد بر اساس دکتر</div>
+    <div class="bar-chart" id="revenueDoctor"></div>
+    <div class="sec-title">پراکندگی خدمات</div>
+    <div class="bar-chart" id="revenueService"></div>
+    <div style="background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);font-size:13px;color:var(--muted);line-height:1.7;margin-top:4px;">
+      ⚠️ <strong>توجه:</strong> این گزارش بر اساس تعداد نوبت‌های ثبت‌شده است.
+      برای گزارش مالی دقیق، لطفاً هزینه هر خدمت را در <strong>config.env</strong>
+      تعریف کنید و سیستم صدور فاکتور را فعال نمایید.
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── تنظیمات ──────────────────────────────────────────────────────────────────
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.expand(); tg.ready(); }
+
+// رمز ادمین از URL param یا هارد-کد (در محیط واقعی از سرور بگیرید)
+// برای امنیت بیشتر این مقدار را از query string بخوانید
+const ADMIN_PWD = new URLSearchParams(location.search).get('pwd') || '';
+
+// ── داده‌های شبیه‌ساز (در محیط واقعی از API بگیرید) ───────────────────────────
+// از آنجا که این یک Web App تلگرام است و backend مستقیم ندارد،
+// داده‌ها را از طریق bot دریافت می‌کنیم یا API جانبی می‌سازیم.
+// اینجا یک نمونه داده برای نمایش طراحی است.
+
+const SAMPLE_STATS = {
+  total: 0, today: 0, upcoming: 0, cancelled: 0, patients: 0,
+  by_doctor: [], last7days: [], by_reason: []
+};
+
+const STATUS_MAP = {
+  pending:   { label: 'در انتظار',   cls: 'pending'   },
+  confirmed: { label: 'تأیید شده',   cls: 'confirmed' },
+  cancelled: { label: 'لغو شده',     cls: 'cancelled' },
+};
+
+const PRICE_MAP = {
+  'معاینه': 300000,
+  'جرم‌گیری': 800000,
+  'پر کردن دندان': 1500000,
+  'کشیدن دندان': 600000,
+  'عصب‌کشی': 2500000,
+  'ایمپلنت': 8000000,
+  'ارتودنسی': 5000000,
+  'سفید کردن': 3000000,
+};
+
+// ── ورود ─────────────────────────────────────────────────────────────────────
+function doLogin() {
+  const val = document.getElementById('pwdInput').value.trim();
+  // رمز از URL param اول بررسی می‌شود؛ اگر نبود از input
+  const urlPwd = new URLSearchParams(location.search).get('pwd') || '';
+  const correctPwd = urlPwd || val; // اگر URL param داشت، پرش مستقیم
+  
+  if (urlPwd) {
+    // ورود خودکار از طریق URL
+    showMain();
+    return;
+  }
+  
+  // رمز را در session نگه دار (در محیط واقعی با سرور verify کنید)
+  sessionStorage.setItem('adminAuth', val);
+  // چون backend نداریم، هر رمزی را می‌پذیریم (در واقع با API بررسی کنید)
+  showMain();
+}
+
+function showMain() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('mainScreen').style.display  = 'block';
+  loadDashboard();
+}
+
+// اگر قبلاً لاگین شده بود
+if (sessionStorage.getItem('adminAuth') || new URLSearchParams(location.search).get('pwd')) {
+  showMain();
+}
+
+// ── تب‌ها ─────────────────────────────────────────────────────────────────────
+const TABS = ['dashboard', 'appointments', 'today', 'report'];
+function switchTab(name) {
+  TABS.forEach(t => {
+    document.getElementById(`sec-${t}`).style.display = t === name ? 'flex' : 'none';
+    document.getElementById(`tab-${t}`).classList.toggle('active', t === name);
+  });
+  if (name === 'appointments') loadAppointments();
+  if (name === 'today')        loadToday();
+  if (name === 'report')       loadReport();
+}
+
+// ── بارگذاری داده (شبیه‌ساز) ─────────────────────────────────────────────────
+// در محیط واقعی اینجا fetch به API سرور می‌زنید
+
+function getStoredAppointments() {
+  // داده‌های نمونه — در پروژه واقعی از API دریافت کنید
+  return JSON.parse(localStorage.getItem('adminApts') || '[]');
+}
+
+function generateSampleData() {
+  const doctors = ['دکتر نقشواریان', 'دکتر فرجی‌نژاد'];
+  const reasons = ['معاینه', 'جرم‌گیری', 'پر کردن دندان', 'کشیدن دندان', 'عصب‌کشی'];
+  const statuses = ['pending', 'confirmed', 'cancelled'];
+  const names = ['علی احمدی', 'مریم رضایی', 'حسن کریمی', 'زهرا محمدی', 'رضا نصیری',
+                 'فاطمه قاسمی', 'محمد صادقی', 'نیلوفر تهرانی', 'امیر خانی', 'سارا بهرامی'];
+  const apts = [];
+  const today = new Date();
+  for (let i = 0; i < 30; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - Math.floor(Math.random() * 14) + 3);
+    const dateStr = d.toISOString().split('T')[0];
+    const h = 9 + Math.floor(Math.random() * 10);
+    const m = Math.random() > .5 ? '00' : '30';
+    apts.push({
+      id: i + 1,
+      patient_name: names[Math.floor(Math.random() * names.length)],
+      patient_phone: '091' + Math.floor(10000000 + Math.random() * 89999999),
+      doctor: doctors[Math.floor(Math.random() * doctors.length)],
+      date: dateStr,
+      date_display: dateStr,
+      time: `${h}:${m}`,
+      reason: reasons[Math.floor(Math.random() * reasons.length)],
+      status: i < 20 ? 'pending' : statuses[Math.floor(Math.random() * statuses.length)],
+    });
+  }
+  localStorage.setItem('adminApts', JSON.stringify(apts));
+  return apts;
+}
+
+function getApts() {
+  let apts = getStoredAppointments();
+  if (!apts.length) apts = generateSampleData();
+  return apts;
+}
+
+// ── داشبورد ───────────────────────────────────────────────────────────────────
+function loadDashboard() {
+  const apts = getApts();
+  const todayStr = new Date().toISOString().split('T')[0];
+  const total     = apts.length;
+  const todayCnt  = apts.filter(a => a.date === todayStr && a.status !== 'cancelled').length;
+  const upcoming  = apts.filter(a => a.date >= todayStr && a.status === 'pending').length;
+  const cancelled = apts.filter(a => a.status === 'cancelled').length;
+  const patients  = new Set(apts.map(a => a.patient_name)).size;
+
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat-card"><div class="icon">📋</div><div class="num">${total}</div><div class="lbl">کل نوبت‌ها</div></div>
+    <div class="stat-card"><div class="icon">📅</div><div class="num">${todayCnt}</div><div class="lbl">نوبت امروز</div></div>
+    <div class="stat-card"><div class="icon">⏳</div><div class="num">${upcoming}</div><div class="lbl">نوبت آینده</div></div>
+    <div class="stat-card"><div class="icon">❌</div><div class="num">${cancelled}</div><div class="lbl">لغو شده</div></div>
+  `;
+
+  // نمودار ۷ روز
+  const days7 = {};
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    days7[d.toISOString().split('T')[0]] = 0;
+  }
+  apts.filter(a => a.status !== 'cancelled').forEach(a => {
+    if (days7[a.date] !== undefined) days7[a.date]++;
+  });
+  const maxDay = Math.max(...Object.values(days7), 1);
+  document.getElementById('chart7days').innerHTML = Object.entries(days7).map(([d, cnt]) => {
+    const short = d.slice(5).replace('-', '/');
+    return `<div class="bar-row">
+      <div class="bar-label">${short}</div>
+      <div class="bar-outer"><div class="bar-inner" style="width:${(cnt/maxDay*100).toFixed(0)}%"></div></div>
+      <div class="bar-val">${cnt}</div>
+    </div>`;
+  }).join('');
+
+  // نمودار دکتر
+  const byDoc = {};
+  apts.filter(a => a.status !== 'cancelled').forEach(a => {
+    byDoc[a.doctor] = (byDoc[a.doctor] || 0) + 1;
+  });
+  const maxDoc = Math.max(...Object.values(byDoc), 1);
+  document.getElementById('chartDoctor').innerHTML = Object.entries(byDoc).map(([d, cnt]) =>
+    `<div class="bar-row">
+      <div class="bar-label">${d.replace('دکتر ', 'د. ')}</div>
+      <div class="bar-outer"><div class="bar-inner" style="width:${(cnt/maxDoc*100).toFixed(0)}%"></div></div>
+      <div class="bar-val">${cnt}</div>
+    </div>`
+  ).join('');
+
+  // دلایل
+  const byReason = {};
+  apts.filter(a => a.status !== 'cancelled').forEach(a => {
+    byReason[a.reason] = (byReason[a.reason] || 0) + 1;
+  });
+  document.getElementById('reasonGrid').innerHTML = Object.entries(byReason)
+    .sort((a,b) => b[1]-a[1])
+    .map(([r, cnt]) =>
+      `<div class="reason-pill">${r} <span>${cnt}</span></div>`
+    ).join('');
+}
+
+// ── لیست نوبت‌ها ──────────────────────────────────────────────────────────────
+function loadAppointments() {
+  let apts = getApts();
+  const status   = document.getElementById('fltStatus')?.value || '';
+  const dateFrom = document.getElementById('fltFrom')?.value   || '';
+  const dateTo   = document.getElementById('fltTo')?.value     || '';
+  if (status)   apts = apts.filter(a => a.status === status);
+  if (dateFrom) apts = apts.filter(a => a.date >= dateFrom);
+  if (dateTo)   apts = apts.filter(a => a.date <= dateTo);
+  apts.sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+  renderAptList('aptList', apts);
+}
+
+function loadToday() {
+  const todayStr = new Date().toISOString().split('T')[0];
+  const apts = getApts().filter(a => a.date === todayStr && a.status !== 'cancelled');
+  apts.sort((a, b) => a.time.localeCompare(b.time));
+  renderAptList('todayList', apts, true);
+}
+
+function renderAptList(containerId, apts, isToday = false) {
+  const el = document.getElementById(containerId);
+  if (!apts.length) {
+    el.innerHTML = `<div class="empty"><div class="ico">📭</div>نوبتی یافت نشد</div>`;
+    return;
+  }
+  el.innerHTML = apts.map(a => {
+    const st = STATUS_MAP[a.status] || { label: a.status, cls: 'pending' };
+    const canConfirm = a.status === 'pending';
+    const canCancel  = a.status !== 'cancelled';
+    return `<div class="apt-card" id="apt-${a.id}">
+      <div class="apt-head">
+        <div class="apt-num">${a.id}</div>
+        <div>
+          <div class="apt-name">${a.patient_name}</div>
+          <div class="apt-phone">${a.patient_phone || '—'}</div>
+        </div>
+        <div class="apt-status ${st.cls}">${st.label}</div>
+      </div>
+      <div class="apt-body">
+        <div class="apt-row"><span class="ico">👨‍⚕️</span>${a.doctor}</div>
+        <div class="apt-row"><span class="ico">📅</span>${a.date_display || a.date}</div>
+        <div class="apt-row"><span class="ico">⏰</span>${a.time}</div>
+        <div class="apt-row"><span class="ico">🦷</span>${a.reason}</div>
+      </div>
+      ${canConfirm || canCancel ? `
+      <div class="apt-actions">
+        ${canConfirm ? `<button class="btn-confirm" onclick="confirmApt(${a.id})">✅ تأیید</button>` : ''}
+        ${canCancel  ? `<button class="btn-cancel-apt" onclick="cancelApt(${a.id})">❌ لغو</button>` : ''}
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function confirmApt(id) {
+  const apts = getApts();
+  const apt  = apts.find(a => a.id === id);
+  if (!apt) return;
+  apt.status = 'confirmed';
+  localStorage.setItem('adminApts', JSON.stringify(apts));
+  showToast('✅ نوبت تأیید شد');
+  loadAppointments();
+}
+
+function cancelApt(id) {
+  const apts = getApts();
+  const apt  = apts.find(a => a.id === id);
+  if (!apt) return;
+  apt.status = 'cancelled';
+  localStorage.setItem('adminApts', JSON.stringify(apts));
+  showToast('❌ نوبت لغو شد');
+  loadAppointments();
+}
+
+// ── گزارش مالی ────────────────────────────────────────────────────────────────
+function loadReport() {
+  const apts = getApts().filter(a => a.status !== 'cancelled');
+  let totalRev = 0;
+  const docRev = {}, svcRev = {};
+  apts.forEach(a => {
+    const price = PRICE_MAP[a.reason] || 500000;
+    totalRev += price;
+    docRev[a.doctor] = (docRev[a.doctor] || 0) + price;
+    svcRev[a.reason] = (svcRev[a.reason] || 0) + price;
+  });
+
+  const fmt = n => n.toLocaleString('fa-IR') + ' تومان';
+
+  document.getElementById('revenueStats').innerHTML = `
+    <div class="stat-card"><div class="icon">💰</div><div class="num" style="font-size:17px">${fmt(totalRev)}</div><div class="lbl">کل درآمد تخمینی</div></div>
+    <div class="stat-card"><div class="icon">📊</div><div class="num" style="font-size:17px">${fmt(Math.round(totalRev/Math.max(apts.length,1)))}</div><div class="lbl">میانگین هر نوبت</div></div>
+  `;
+
+  const maxDoc = Math.max(...Object.values(docRev), 1);
+  document.getElementById('revenueDoctor').innerHTML = Object.entries(docRev)
+    .map(([d, v]) => `<div class="bar-row">
+      <div class="bar-label">${d.replace('دکتر ', 'د. ')}</div>
+      <div class="bar-outer"><div class="bar-inner" style="width:${(v/maxDoc*100).toFixed(0)}%"></div></div>
+      <div class="bar-val" style="font-size:10px">${(v/1000000).toFixed(1)}م</div>
+    </div>`).join('');
+
+  const maxSvc = Math.max(...Object.values(svcRev), 1);
+  document.getElementById('revenueService').innerHTML = Object.entries(svcRev)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([s, v]) => `<div class="bar-row">
+      <div class="bar-label" style="min-width:90px">${s}</div>
+      <div class="bar-outer"><div class="bar-inner" style="width:${(v/maxSvc*100).toFixed(0)}%"></div></div>
+      <div class="bar-val" style="font-size:10px">${(v/1000000).toFixed(1)}م</div>
+    </div>`).join('');
+}
+
+// ── toast ─────────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
