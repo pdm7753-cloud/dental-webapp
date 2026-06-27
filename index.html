@@ -574,7 +574,12 @@ class Drum {
   }
 
   _render() {
-    const n = this.items.length;
+    if (this.items.length === 0) {
+      this.list.innerHTML = `<div class="drum-item" style="color:var(--muted);font-size:13px;">نوبتی نیست</div>`;
+      this.list.style.transition = 'none';
+      this.list.style.transform = `translateY(${DRUM_H}px)`;
+      return;
+    }
     this.list.innerHTML = this.items.map((v, i) =>
       `<div class="drum-item${i === this.idx ? ' selected' : ''}">${v}</div>`
     ).join('');
@@ -582,6 +587,7 @@ class Drum {
   }
 
   _setY(idx, animate = true) {
+    if (this.items.length === 0) return;
     this.idx = Math.max(0, Math.min(idx, this.items.length - 1));
     const offset = DRUM_H - this.idx * DRUM_H; // یه آیتم از بالا offset
     this.list.style.transition = animate ? 'transform .18s cubic-bezier(.25,.46,.45,.94)' : 'none';
@@ -670,11 +676,22 @@ const MONTH_CYCLE = Array.from({length: 12}, (_, i) => {
 });
 const MONTH_LABELS = MONTH_CYCLE.map(x => x.label);
 
-function buildTimeSlots() {
+function buildTimeSlots(isToday) {
   const slots = [];
   let h = WORK_START, m = 0;
+
+  // اگه روز انتخاب‌شده «امروز» باشه، ساعت/دقیقه فعلی تهران رو برای فیلتر کردن اسلات‌های گذشته می‌گیریم
+  let nowH = -1, nowM = -1;
+  if (isToday) {
+    const tehran = new Date(Date.now() + (3.5 * 60 * 60 * 1000));
+    nowH = tehran.getUTCHours();
+    nowM = tehran.getUTCMinutes();
+  }
+
   while (h < WORK_END) {
-    if (!(h >= LUNCH_S && h < LUNCH_E))
+    const isLunch = (h >= LUNCH_S && h < LUNCH_E);
+    const isPastSlot = isToday && (h < nowH || (h === nowH && m <= nowM));
+    if (!isLunch && !isPastSlot)
       slots.push(TO_FA(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`));
     m += DURATION;
     if (m >= 60) { h += Math.floor(m / 60); m %= 60; }
@@ -689,9 +706,16 @@ function buildDayList(monthCycleIdx) {
   return Array.from({length: total}, (_, i) => TO_FA(i + 1));
 }
 
+function isSelectedDayToday(monthCycleIdx, day) {
+  const { yOff } = MONTH_CYCLE[monthCycleIdx];
+  return yOff === 0 && monthCycleIdx === 0 && day === todayJD;
+}
+
 function initDrums() {
   const initMi = 0; // ماه جاری همیشه اول لیست است
   const initDi = todayJD - 1;
+  const initIsToday = isSelectedDayToday(0, todayJD);
+  const initSlots = buildTimeSlots(initIsToday);
 
   drumMonth = new Drum('drum-month', 'list-month', MONTH_LABELS, initMi, (i) => {
     state.monthCycleIdx = i;
@@ -702,17 +726,28 @@ function initDrums() {
   drumDay = new Drum('drum-day', 'list-day', buildDayList(0), initDi, (i) => {
     state.day = i + 1;
     readDate();
+    updateTimeList();
   });
 
-  drumTime = new Drum('drum-time', 'list-time', buildTimeSlots(), 0, (i, v) => {
+  drumTime = new Drum('drum-time', 'list-time', initSlots, 0, (i, v) => {
     state.time = String(FROM_FA(v));
     updateNextBtn();
   });
 
   state.monthCycleIdx = 0;
   state.day   = todayJD;
-  state.time  = buildTimeSlots()[0]?.replace(/[۰-۹]/g, d => d.charCodeAt(0) - '۰'.charCodeAt(0)) || '09:00';
+  state.time  = initSlots[0]?.replace(/[۰-۹]/g, d => d.charCodeAt(0) - '۰'.charCodeAt(0)) || null;
   readDate();
+}
+
+function updateTimeList() {
+  if (!drumTime) return;
+  const mi = state.monthCycleIdx ?? 0;
+  const isToday = isSelectedDayToday(mi, state.day);
+  const slots = buildTimeSlots(isToday);
+  drumTime.setItems(slots, 0);
+  state.time = slots[0]?.replace(/[۰-۹]/g, d => d.charCodeAt(0) - '۰'.charCodeAt(0)) || null;
+  updateNextBtn();
 }
 
 function updateDayList() {
@@ -723,6 +758,7 @@ function updateDayList() {
   drumDay.setItems(days, curDay);
   state.day = curDay + 1;
   readDate();
+  updateTimeList();
 }
 
 function readDate() {
@@ -773,6 +809,7 @@ function updateNextBtn() {
     ok = !!state.dateGregorian && !!state.time;
     if (state.isFriday) { btn.disabled = true; btn.textContent = 'جمعه تعطیل است'; return; }
     if (state.isPast)   { btn.disabled = true; btn.textContent = 'تاریخ گذشته است'; return; }
+    if (!state.time)    { btn.disabled = true; btn.textContent = 'نوبتی برای امروز باقی نمانده'; return; }
   }
   if (currentPage === 3) ok = !!state.reason;
   if (currentPage === 4) { btn.disabled = false; btn.textContent = '✅ ثبت نوبت'; btn.classList.add('confirm'); return; }
