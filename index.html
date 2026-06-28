@@ -704,6 +704,12 @@ let drumMonth, drumDay, drumTime;
 let [todayJY, todayJM, todayJD] = todayJalali();
 
 const WORK_START = 9, WORK_END = 20, LUNCH_S = 13, LUNCH_E = 14, DURATION = 30;
+// بازه‌های مجاز: صبح ۹-۱۲:۳۰ و عصر ۱۶-۲۰
+const ALLOWED_RANGES = [{start: 9*60, end: 12*60+30}, {start: 16*60, end: 20*60}];
+function isAllowedSlot(h, m) {
+  const mins = h * 60 + m;
+  return ALLOWED_RANGES.some(r => mins >= r.start && mins < r.end);
+}
 
 // لیست ۱۲ ماه آینده شروع‌شده از ماه جاری (چرخشی) — سال به‌صورت خودکار محاسبه می‌شود
 const MONTH_CYCLE = Array.from({length: 12}, (_, i) => {
@@ -726,9 +732,8 @@ function buildTimeSlots(isToday) {
   }
 
   while (h < WORK_END) {
-    const isLunch = (h >= LUNCH_S && h < LUNCH_E);
     const isPastSlot = isToday && (h < nowH || (h === nowH && m <= nowM));
-    if (!isLunch && !isPastSlot)
+    if (isAllowedSlot(h, m) && !isPastSlot)
       slots.push(TO_FA(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`));
     m += DURATION;
     if (m >= 60) { h += Math.floor(m / 60); m %= 60; }
