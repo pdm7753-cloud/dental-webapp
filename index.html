@@ -912,11 +912,22 @@ function submitBooking() {
     reason:       state.reason,
   };
 
-  if (tg) {
-    tg.sendData(JSON.stringify(payload));
-  } else {
-    // fallback برای تست در مرورگر
-    alert('داده ارسال شد:\n' + JSON.stringify(payload, null, 2));
+  // بررسی کامل بودن داده‌ها
+  if (!payload.doctor || !payload.date || !payload.time || !payload.reason) {
+    showToast('اطلاعات ناقص است. لطفاً دوباره تلاش کنید.');
+    return;
+  }
+
+  const dataStr = JSON.stringify(payload);
+
+  try {
+    if (tg && tg.sendData) {
+      tg.sendData(dataStr);
+    } else {
+      alert('داده ارسال شد:\n' + dataStr);
+    }
+  } catch(e) {
+    showToast('خطا در ارسال: ' + e.message);
   }
 }
 
